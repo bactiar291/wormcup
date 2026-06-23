@@ -369,8 +369,7 @@ def run_account(account, play_count=DEFAULT_PLAY_LIMIT, predict_max=DEFAULT_PRED
         if play_count == 0:
             print(f'[{name}] play skipped')
         else:
-            n = play_count if play_count > 0 else 0
-            result = api.play(n=n, delay=play_delay)
+            result = api.play(n=play_count, delay=play_delay)
             last_code = result['last'][0] if result.get('last') else None
             print(f'[{name}] play OK {result["ok"]}/{result["target"]} last={last_code} 429={result["rate_limited"]}')
 
