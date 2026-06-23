@@ -324,18 +324,34 @@ class WormCupAPI:
         for m in matches:
             if len(made) >= max_count:
                 break
-            if m.get('pool', {}).get('status') != 'OPEN' or m.get('my_prediction'):
+            if m.get('my_prediction'):
+                continue
+            home = m.get('home', {}).get('name', '?')
+            away = m.get('away', {}).get('name', '?')
+            tiers = m.get('tiers') or []
+            # Try EXACT_SCORE first (with scorer), then OUTCOME
+            tier = next((t for t in tiers if t.get('mode') == 'EXACT_SCORE' and t.get('status') == 'OPEN'), None)
+            if not tier:
+                tier = next((t for t in tiers if t.get('mode') == 'OUTCOME' and t.get('status') == 'OPEN'), None)
+            if not tier:
                 continue
             hs, aas, reason = pick_score(m)
-            body = {'condition_id': m['condition_id'], 'home_score': hs, 'away_score': aas}
+            body = {'condition_id': tier['condition_id'], 'home_score': hs, 'away_score': aas}
+            # EXACT_SCORE tier may require scorer_jersey
+            if tier.get('mode') == 'EXACT_SCORE':
+                athletes = m.get('athletes') or []
+                # Pick first forward/midfielder from predicted winning team
+                winner_team = 'home' if hs > aas else ('away' if aas > hs else 'home')
+                team_code = m.get(winner_team, {}).get('code', '')
+                scorer = next((a for a in athletes if a.get('team') == team_code and a.get('position') in ('F', 'M')), None)
+                if scorer:
+                    body['scorer_jersey'] = scorer.get('jersey')
             res = self.post('/api/worldcup/predictions/', body)
             made.append({
-                'home': m.get('home', {}).get('name'),
-                'away': m.get('away', {}).get('name'),
-                'score': f'{hs}-{aas}',
-                'reason': reason,
-                'status': res[0],
-                'body': res[1],
+                'home': home, 'away': away,
+                'score': f'{hs}-{aas}', 'reason': reason,
+                'tier': tier.get('tier', '?'), 'mode': tier.get('mode', '?'),
+                'status': res[0], 'body': res[1],
             })
         return made
 
